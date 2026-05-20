@@ -1,0 +1,56 @@
+name: Postgres — Create user and database
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_name:
+        description: 'Database name to create'
+        required: true
+        type: string
+      db_user:
+        description: 'Username to create'
+        required: true
+        type: string
+      db_password:
+        description: 'Password for the user'
+        required: true
+        type: string
+
+jobs:
+  create-user:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Create user and database on postgres
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_NAME: ${{ inputs.db_name }}
+          DB_USER: ${{ inputs.db_user }}
+          DB_PASSWORD: ${{ inputs.db_password }}
+          POSTGRES_ADMIN_USER: ${{ secrets.POSTGRES_ADMIN_USER }}
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.POSTGRES_VM_HOST }}
+          username: ${{ secrets.POSTGRES_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: DB_NAME,DB_USER,DB_PASSWORD,POSTGRES_ADMIN_USER,POSTGRES_ADMIN_PASSWORD
+          script: |
+            PSQL="docker exec -e PGPASSWORD=$POSTGRES_ADMIN_PASSWORD ignis-postgres psql -U $POSTGRES_ADMIN_USER"
+
+            echo "--- Creating user '$DB_USER'..."
+            $PSQL -c "CREATE USER \"$DB_USER\" WITH PASSWORD '$DB_PASSWORD';" 2>/dev/null \
+              || $PSQL -c "ALTER USER \"$DB_USER\" WITH PASSWORD '$DB_PASSWORD';"
+
+            echo "--- Creating database '$DB_NAME'..."
+            $PSQL -c "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" 2>/dev/null \
+              || echo "Database '$DB_NAME' already exists, continuing..."
+
+            echo "--- Granting privileges..."
+            $PSQL -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";"
+            $PSQL -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
+            $PSQL -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$DB_USER\";"
+            $PSQL -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$DB_USER\";"
+            $PSQL -d "$DB_NAME" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO \"$DB_USER\";"
+
+            echo "Done — '$DB_USER' has full admin access to '$DB_NAME'"
