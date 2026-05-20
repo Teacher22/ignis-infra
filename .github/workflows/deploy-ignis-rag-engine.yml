@@ -1,0 +1,44 @@
+name: Deploy ignis-rag-engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/ignis-rag-engine/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy service config to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          source: "services/ignis-rag-engine/"
+          target: "/home/ignis-deploy/ignis-infra/services/ignis-rag-engine"
+          strip_components: 2
+
+      - name: Restart containers
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: GHCR_USERNAME,GHCR_TOKEN
+          script: |
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            cd /home/ignis-deploy/ignis-infra/services/ignis-rag-engine
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
+            echo "ignis-rag-engine deployed successfully"
