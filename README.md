@@ -1,69 +1,69 @@
 # ignis-infra
 
-Centralised infrastructure-as-code for all Ignis services.
+Infrastructure-as-code for the Ignis platform. Infra components and application services are fully decoupled — each has its own deployment lifecycle and can run on separate VMs.
 
 ## Structure
 
 ```
 ignis-infra/
-├── components/               # reusable building blocks (reference configs)
+├── components/                    # infra — deployed and managed independently
 │   ├── postgres/
 │   ├── qdrant/
 │   └── redis/
-├── services/                 # one folder per service — this is the deploy unit
-│   ├── ignis-fit/
-│   │   ├── docker-compose.yml
-│   │   └── .env.example
-│   └── ignis-rag-engine/
-│       ├── docker-compose.yml
-│       └── .env.example
-└── .github/
-    └── workflows/
-        ├── deploy-ignis-fit.yml
-        └── deploy-ignis-rag-engine.yml
+└── services/                      # apps — only containers, no infra
+    ├── ignis-fit/                  # backend + frontend
+    └── ignis-rag-engine/           # api + worker + web
 ```
 
-## VM setup (first time only)
+## How it works
 
-The VM needs no git access. Just create the directory structure and place the `.env` file:
+- **Components** deploy to an infra VM. Each has its own workflow triggered by changes to that component only.
+- **Services** deploy to an app VM. They connect to infra via `DB_HOST`, `REDIS_HOST`, `QDRANT_HOST` env vars in their `.env` file.
+- Neither side knows about the other at deploy time — fully independent lifecycles.
 
-```bash
-mkdir -p /root/ignis-infra/services/ignis-fit
-mkdir -p /root/ignis-infra/services/ignis-rag-engine
+## GitHub secrets
 
-# Copy .env.example from this repo and fill in real secrets
-cp services/ignis-fit/.env.example /root/ignis-infra/services/ignis-fit/.env
-# edit .env with real values — this file stays on the VM, never committed
-```
-
-Also add the GitHub Actions SSH public key to `~/.ssh/authorized_keys` on the VM so deployments can connect.
-
-## Deployments
-
-Deployments trigger automatically on push to `main` when files under `services/<name>/` change.
-You can also trigger manually via **Actions → Deploy <service> → Run workflow**.
-
-The workflow:
-1. Checks out the repo in GitHub Actions
-2. `scp`s the service folder to the VM (overwrites `docker-compose.yml` only — `.env` is untouched)
-3. SSHs in, pulls updated Docker images from GHCR
-4. Restarts containers with `docker compose up -d --remove-orphans`
-
-## Required GitHub secrets
-
-Set these under **Settings → Secrets → Actions** in this repo:
-
+### Shared
 | Secret | Description |
 |--------|-------------|
-| `VM_HOST` | IP or hostname of the target VM |
-| `VM_USER` | SSH username |
-| `VM_SSH_PRIVATE_KEY` | Private key for SSH access to the VM |
-| `GHCR_USERNAME` | GitHub username / org (for `docker login ghcr.io`) |
+| `VM_SSH_PRIVATE_KEY` | SSH private key used across all deployments |
+| `GHCR_USERNAME` | GitHub username for `docker login ghcr.io` |
 | `GHCR_TOKEN` | GitHub PAT with `read:packages` scope |
+
+### Per component (can point to same VM or different VMs)
+| Secret | Description |
+|--------|-------------|
+| `POSTGRES_VM_HOST` | IP of VM running postgres |
+| `POSTGRES_VM_USER` | SSH user on that VM |
+| `QDRANT_VM_HOST` | IP of VM running qdrant |
+| `QDRANT_VM_USER` | SSH user on that VM |
+| `REDIS_VM_HOST` | IP of VM running redis |
+| `REDIS_VM_USER` | SSH user on that VM |
+
+### Per service
+| Secret | Description |
+|--------|-------------|
+| `VM_HOST` | IP of VM running app services |
+| `VM_USER` | SSH user on that VM |
+
+## VM setup (first time per VM)
+
+```bash
+# Create directory structure
+mkdir -p /home/ignis-deploy/ignis-infra/components/postgres
+mkdir -p /home/ignis-deploy/ignis-infra/components/qdrant
+mkdir -p /home/ignis-deploy/ignis-infra/components/redis
+mkdir -p /home/ignis-deploy/ignis-infra/services/ignis-fit
+mkdir -p /home/ignis-deploy/ignis-infra/services/ignis-rag-engine
+
+# Place .env files from the .env.example templates, fill in real values
+# Components: components/<name>/.env
+# Services: services/<name>/.env
+```
 
 ## Adding a new service
 
-1. Create `services/<service-name>/docker-compose.yml` — include the infra components it needs plus app service entries
-2. Create `services/<service-name>/.env.example`
-3. Copy `.github/workflows/deploy-ignis-fit.yml` → `deploy-<service-name>.yml` and update the `paths:` filter and `cd` path
-4. On the VM: `cp .env.example .env`, fill secrets, `docker compose up -d`
+1. Create `services/<name>/docker-compose.yml` — app containers only, use `${DB_HOST}` etc. for infra addresses
+2. Create `services/<name>/.env.example`
+3. Copy an existing service workflow and update the `paths:` filter and `cd` path
+4. On the app VM: create the directory and place the `.env` file

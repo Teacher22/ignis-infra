@@ -1,0 +1,37 @@
+name: Deploy redis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/redis/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy config to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REDIS_VM_HOST }}
+          username: ${{ secrets.REDIS_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          source: "components/redis/"
+          target: "/home/ignis-deploy/ignis-infra/components/redis"
+          strip_components: 2
+
+      - name: Restart redis
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REDIS_VM_HOST }}
+          username: ${{ secrets.REDIS_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ignis-deploy/ignis-infra/components/redis
+            docker compose up -d --remove-orphans
+            echo "redis deployed successfully"

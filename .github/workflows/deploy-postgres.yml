@@ -1,0 +1,37 @@
+name: Deploy postgres
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/postgres/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy config to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.POSTGRES_VM_HOST }}
+          username: ${{ secrets.POSTGRES_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          source: "components/postgres/"
+          target: "/home/ignis-deploy/ignis-infra/components/postgres"
+          strip_components: 2
+
+      - name: Restart postgres
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.POSTGRES_VM_HOST }}
+          username: ${{ secrets.POSTGRES_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ignis-deploy/ignis-infra/components/postgres
+            docker compose up -d --remove-orphans
+            echo "postgres deployed successfully"

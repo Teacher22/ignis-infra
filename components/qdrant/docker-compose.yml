@@ -1,6 +1,7 @@
 services:
   qdrant:
     image: qdrant/qdrant:v1.11.0
+    container_name: ignis-qdrant
     restart: unless-stopped
     volumes:
       - qdrant_data:/qdrant/storage

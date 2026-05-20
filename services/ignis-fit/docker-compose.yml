@@ -1,35 +1,16 @@
 services:
-  db:
-    image: postgres:16
-    container_name: ignisfit-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_NAME:-ignis_fit}
-      POSTGRES_USER: ${DB_USER:-ignis_fit}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ignis_fit_admin}
-    volumes:
-      - ignisfit_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ignis_fit} -d ${DB_NAME:-ignis_fit}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/teacher22/ignisfit-backend:latest}
     container_name: ignisfit-backend
     restart: unless-stopped
     env_file: .env
     environment:
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-ignis_fit}
-      DB_USER: ${DB_USER:-ignis_fit}
-      DB_PASSWORD: ${DB_PASSWORD:-ignis_fit_admin}
+      DB_URL: jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       SUPER_ADMIN_SECRET: ${SUPER_ADMIN_SECRET}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8080:8080"
 
@@ -41,6 +22,3 @@ services:
       - backend
     ports:
       - "80:80"
-
-volumes:
-  ignisfit_db_data:

@@ -1,0 +1,37 @@
+name: Deploy qdrant
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/qdrant/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy config to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.QDRANT_VM_HOST }}
+          username: ${{ secrets.QDRANT_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          source: "components/qdrant/"
+          target: "/home/ignis-deploy/ignis-infra/components/qdrant"
+          strip_components: 2
+
+      - name: Restart qdrant
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.QDRANT_VM_HOST }}
+          username: ${{ secrets.QDRANT_VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ignis-deploy/ignis-infra/components/qdrant
+            docker compose up -d --remove-orphans
+            echo "qdrant deployed successfully"
