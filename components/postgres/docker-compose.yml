@@ -16,6 +16,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ignis-net
 
 volumes:
   postgres_data:
+
+networks:
+  ignis-net:
+    name: ignis-net
+    driver: bridge
