@@ -5,13 +5,15 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DB_URL: jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}
+      DB_URL: jdbc:postgresql://ignis-postgres:5432/${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       SUPER_ADMIN_SECRET: ${SUPER_ADMIN_SECRET}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+    networks:
+      - ignis-net
     ports:
       - "8080:8080"
 
@@ -23,3 +25,8 @@ services:
       - backend
     ports:
       - "80:80"
+
+networks:
+  ignis-net:
+    external: true
+    name: ignis-net
