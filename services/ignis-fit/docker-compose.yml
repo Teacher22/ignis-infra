@@ -4,6 +4,8 @@ services:
     container_name: ignisfit-backend
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/credentials/gcs-key.json:ro
     environment:
       DB_URL: jdbc:postgresql://ignis-postgres:5432/${DB_NAME}
       DB_USER: ${DB_USER}
@@ -11,7 +13,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SUPER_ADMIN_SECRET: ${SUPER_ADMIN_SECRET}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      GOOGLE_APPLICATION_CREDENTIALS: /credentials/gcs-key.json
     networks:
       - ignis-net
     ports:
