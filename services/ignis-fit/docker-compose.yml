@@ -27,6 +27,8 @@ services:
       - backend
     ports:
       - "80:80"
+    networks:
+      - ignis-net
 
 networks:
   ignis-net:
